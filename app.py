@@ -1,4 +1,6 @@
 from flask import Flask, request, jsonify
+from firebase_admin import credentials, firestore, initialize_app
+
 import pickle
 
 app = Flask(__name__)
@@ -36,6 +38,18 @@ def predict():
 @app.route('/ping', methods=['GET'])
 def ping():
     return jsonify({'response': 'pong'})
+
+# delete firebase user
+# @app.route('/delete', methods=['POST'])
+# def delete():
+#     # Get the request data
+#     data = request.get_json()
+    
+#     # Extract features from the request data
+#     user = [data['user']] 
+#     # Initialize Firebase authentication
+#     cred = credentials.Certificate('serviceAccountKey.json')
+    
 
 if __name__ == '__main__':
     app.run(debug=True)
