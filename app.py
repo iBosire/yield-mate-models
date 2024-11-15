@@ -22,7 +22,7 @@ with open('crop_recommendation_model.pkl', 'rb') as model_file:
 
 @app.route('/test', methods=['GET'])
 def test():
-    # Dummy data for testing
+    # Dummy data
     dummy_data = {
         "Rainfall": 100,
         "Temperature": 25,
@@ -32,7 +32,7 @@ def test():
         "pH": 6.5,
         "Humidity": 60,
         "plot_size": 2,
-        "crop": "wheat",  # Example crop for testing
+        "crop": "wheat", 
         "price": 10
     }
 
@@ -89,6 +89,9 @@ def test():
             'rec_prediction': rec_prediction,
             'suitability_factor': suitability_factor
         }
+
+        db.collection('crop_predictions').add(response)
+
         return jsonify({'response': response})
 
     except Exception as e:
@@ -103,45 +106,70 @@ def predict():
         data = request.get_json()
 
         # Check if all required keys are present
-        required_keys = ['Rainfall', 'Temperature', 'Nitrogen', 'Phosphorus', 'Potassium', 'pH', 'Humidity', 'plot_size', 'crop', 'price']
+        required_keys = ['Rainfall', 'Temperature', 'Nitrogen', 'Phosphorus', 'Potassium', 'pH', 'Humidity', 'plot_size', 'crop', 'price', 'plot_id']
         if not all(key in data for key in required_keys):
             return jsonify({'error': 'Missing one or more required fields'}), 400
 
-        # Extract features for prediction
-        features = [data[key] for key in ['Rainfall', 'Temperature', 'Nitrogen', 'Phosphorus', 'Potassium']]
-        
-        # Make predictions
-        linear_prediction = linear_model.predict([features])[0]
-        rfr_prediction = rfr_model.predict([features])[0]
+        # Crop categories
+        crop_types = {
+            'cereals': ['rice', 'maize'],
+            'legumes': ['chickpea', 'kidneybeans', 'pigeonpeas', 'mothbeans', 'mungbean', 'blackgram', 'lentil'],
+            'fruits': ['pomegranate', 'banana', 'mango', 'grapes', 'watermelon', 'muskmelon', 'apple', 'orange', 'papaya', 'coconut'],
+            'cash_crops': ['cotton', 'jute', 'coffee']
+        }
 
-        # Calculate revenue based on predictions and plot size/price
+        # Function to determine crop type
+        def get_crop_type(crop):
+            for category, crops in crop_types.items():
+                if crop.lower() in crops:
+                    return category
+            return None
+
+        # Extract features for prediction
+        pred_features = [data[key] for key in ['Rainfall', 'Temperature', 'Nitrogen', 'Phosphorus', 'Potassium']]
+        rec_features = [data[key] for key in ['Nitrogen', 'Phosphorus', 'Potassium', 'Temperature', 'Humidity', 'pH', 'Rainfall']]
+        
+        # run models
+        linear_prediction = linear_model.predict([pred_features])[0]
+        rfr_prediction = rfr_model.predict([pred_features])[0]
+        rec_prediction = rec_model.predict([rec_features])[0]
+
+        # Determine the crop type of both
+        actual_crop = data['crop']
+        actual_crop_type = get_crop_type(actual_crop)
+        rec_crop_type = get_crop_type(rec_prediction)
+
+        # Determine suitability factor
+        if actual_crop.lower() == rec_prediction.lower():
+            # Exact match
+            suitability_factor = 1  
+        elif actual_crop_type == rec_crop_type:
+            # Same type
+            suitability_factor = 0.9  
+        else:
+            # Different type
+            suitability_factor = 0.7  
+
+        # Adjust revenue based on suitability factor
         plot_size = data['plot_size']
         price_per_kg = data['price']
-        estimated_revenue_linear = linear_prediction * plot_size * price_per_kg
-        estimated_revenue_rfr = rfr_prediction * plot_size * price_per_kg
+        estimated_revenue_linear = linear_prediction * plot_size * price_per_kg * suitability_factor
+        estimated_revenue_rfr = rfr_prediction * plot_size * price_per_kg * suitability_factor
 
-        # Prepare data to store in Firestore
-        prediction_data = {
-            'linear_prediction': linear_prediction,
+        # Prepare the response
+        response = {
+            'yieldAmount': linear_prediction,
             'rfr_prediction': rfr_prediction,
             'estimated_revenue_linear': estimated_revenue_linear,
             'estimated_revenue_rfr': estimated_revenue_rfr,
-            'crop': data['crop'],
-            'timestamp': firestore.SERVER_TIMESTAMP
+            'rec_prediction': rec_prediction,
+            'score': suitability_factor
         }
 
-        # Update Firestore
-        db.collection('crop_predictions').add(prediction_data)
+        # Save the response to Firestore
+        db.collection('plots').update({data['plot_id']: response})
 
-        # Return the response
-        response = {
-            'linear_prediction': linear_prediction,
-            'rfr_prediction': rfr_prediction,
-            'estimated_revenue_linear': estimated_revenue_linear,
-            'estimated_revenue_rfr': estimated_revenue_rfr
-        }
         return jsonify({'response': response})
-
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
