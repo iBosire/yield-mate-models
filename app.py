@@ -178,7 +178,8 @@ def predict():
             'predictedYield': linear_prediction,
             'predictedRevenue': estimated_revenue_rfr,
             'recommendedCrop': rec_prediction,
-            'score': suitability_factor * 100
+            'score': suitability_factor * 100,
+            'status': 1
         }
         
         # Save the prediction to Firestore
@@ -187,7 +188,7 @@ def predict():
         print(f"Updating plot with ID: {plot_id}")
         collection_ref.document(plot_id).set(updated_data, merge=True)
 
-        return jsonify({'response': response})
+        return jsonify({'response': response}), 200
 
     except Exception as e:
         print(f"Error: {e}")
