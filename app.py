@@ -175,8 +175,8 @@ def predict():
         }
 
         updated_data = {
-            'yieldAmount': linear_prediction,
-            'estimatedRevenue': estimated_revenue_rfr,
+            'predictedYield': linear_prediction,
+            'predictedRevenue': estimated_revenue_rfr,
             'recommendedCrop': rec_prediction,
             'score': suitability_factor * 100
         }
