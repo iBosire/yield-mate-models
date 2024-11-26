@@ -163,7 +163,7 @@ def predict():
         # Adjust revenue based on suitability factor
         plot_size = plot_data['plot_size']
         price_per_kg = plot_data['price']
-        estimated_revenue_rfr = linear_prediction * plot_size * price_per_kg * suitability_factor
+        estimated_revenue_rfr = linear_prediction * plot_size * (price_per_kg * 1000) * suitability_factor
 
         # Prepare the response
         response = {
@@ -175,7 +175,7 @@ def predict():
         }
 
         updated_data = {
-            'predictedYield': linear_prediction,
+            'predictedYield': linear_prediction * 1000,
             'predictedRevenue': estimated_revenue_rfr,
             'recommendedCrop': rec_prediction,
             'score': suitability_factor * 100,
